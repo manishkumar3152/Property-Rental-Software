@@ -1,0 +1,80 @@
+export const NAV_ITEMS = [
+  {
+    id: 'dashboard',
+    label: 'Dashboard',
+    icon: 'LayoutDashboard',
+    roles: ['super_admin', 'owner', 'staff'],
+  },
+  {
+    id: 'properties',
+    label: 'Properties',
+    icon: 'Building2',
+    roles: ['super_admin', 'owner', 'staff'],
+  },
+  {
+    id: 'owners',
+    label: 'Property Owners',
+    icon: 'Users',
+    roles: ['super_admin'],
+  },
+  {
+    id: 'tenants',
+    label: 'Tenants',
+    icon: 'UserCheck',
+    roles: ['super_admin', 'owner', 'staff'],
+  },
+  {
+    id: 'agreements',
+    label: 'Rental Agreements',
+    icon: 'FileText',
+    roles: ['super_admin', 'owner', 'staff'],
+  },
+  {
+    id: 'rent',
+    label: 'Rent Invoices',
+    icon: 'Receipt',
+    roles: ['super_admin', 'owner', 'staff'],
+  },
+  {
+    id: 'payments',
+    label: 'Payments & Ledger',
+    icon: 'CreditCard',
+    roles: ['super_admin', 'owner'],
+  },
+  {
+    id: 'receipts',
+    label: 'Official Receipts',
+    icon: 'CheckSquare',
+    roles: ['super_admin', 'owner', 'staff'],
+  },
+  {
+    id: 'settlements',
+    label: 'Settlements & Payouts',
+    icon: 'Landmark',
+    roles: ['super_admin', 'owner'],
+  },
+  {
+    id: 'whatsapp',
+    label: 'WhatsApp Gateway',
+    icon: 'MessageSquare',
+    roles: ['super_admin', 'staff'],
+  },
+  {
+    id: 'reports',
+    label: 'Advanced Reports',
+    icon: 'BarChart3',
+    roles: ['super_admin', 'owner'],
+  },
+  {
+    id: 'settings',
+    label: 'Application Settings',
+    icon: 'Settings',
+    roles: ['super_admin'],
+  },
+  {
+    id: 'audit',
+    label: 'Audit Trail',
+    icon: 'ShieldCheck',
+    roles: ['super_admin'],
+  },
+];
