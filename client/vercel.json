@@ -1,0 +1,12 @@
+﻿{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://property-rental-software-rp9z.vercel.app/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
