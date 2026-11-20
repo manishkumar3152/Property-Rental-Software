@@ -38,7 +38,7 @@ const connectDB = async () => {
       .catch((error) => {
         cached.promise = null;
         console.error(`[Database Error] Connection failed: ${error.message}`);
-        throw error; // process.exit mat karo (serverless me crash hota hai)
+        throw error;
       });
   }
 

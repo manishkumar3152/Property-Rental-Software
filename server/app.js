@@ -94,6 +94,7 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const errorHandler = require('./middleware/errorHandler');
 const routes = require('./routes');
+const connectDB = require('./config/db');
 
 const app = express();
 
@@ -115,11 +116,9 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    // allow requests with no origin like curl or mobile apps
     if (!origin || allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-    // In dev, permit origin
     return callback(null, true);
   },
   credentials: true,
@@ -139,18 +138,7 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Rate limiter for auth endpoints
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // max 100 requests per window
-  message: { success: false, message: 'Too many login attempts. Please try again later.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-  validate: { xForwardedForHeader: false, forwardedHeader: false },
-});
-app.use('/api/auth/login', authLimiter);
-
-// Health check endpoint
+// Health check (DB ke bina chalta hai)
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     status: 'online',
@@ -159,6 +147,31 @@ app.get('/api/health', (req, res) => {
     timezone: 'Asia/Kolkata',
   });
 });
+
+// Har request se pehle DB connect (serverless ke liye, connection cache hota hai)
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error('[DB] connect failed:', err.message);
+    res.status(500).json({
+      success: false,
+      message: `Database connection failed: ${err.message}`,
+    });
+  }
+});
+
+// Rate limiter for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { success: false, message: 'Too many login attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false, forwardedHeader: false },
+});
+app.use('/api/auth/login', authLimiter);
 
 // Main API Routes
 app.use('/api', routes);
