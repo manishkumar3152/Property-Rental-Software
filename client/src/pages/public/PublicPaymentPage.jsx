@@ -78,15 +78,32 @@ const PublicPaymentPage = ({ token: propToken, onBackToLogin }) => {
           handler: async function (response) {
             try {
               const verifyRes = await publicApi.verifyPayment(token, {
-                razorpay_order_id: response.razorpay_order_id,
+                razorpay_order_id: response.razorpay_order_id || order.orderId,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
               });
               setPaymentSuccess(verifyRes.data.data);
-              toastSuccess('Payment successful!');
+              toastSuccess('Payment successful! Official receipt generated.');
               fetchInvoice();
             } catch (vErr) {
-              toastError('Payment signature verification failed');
+              console.warn('[Checkout Verify Fallback]', vErr.response?.data || vErr.message);
+              // Check if payment was already recorded by webhook or instant capture
+              try {
+                const refreshed = await publicApi.getInvoiceByToken(token);
+                if (refreshed.data.data?.paymentStatus === 'Paid') {
+                  setPaymentSuccess({
+                    receiptNumber: refreshed.data.data.receipt?.receiptNumber,
+                    receiptId: refreshed.data.data.receipt?._id,
+                    amountPaid: refreshed.data.data.financials?.amountPaid || refreshed.data.data.financials?.totalPayable,
+                    transactionId: response.razorpay_payment_id,
+                  });
+                  toastSuccess('Payment verified successfully!');
+                  setInvoiceData(refreshed.data.data);
+                  return;
+                }
+              } catch (_) {}
+
+              toastError(vErr.response?.data?.message || 'Payment verification could not be completed');
             }
           },
           prefill: {

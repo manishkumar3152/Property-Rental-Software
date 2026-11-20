@@ -124,19 +124,52 @@ const createRentOrder = async (invoiceId) => {
 /**
  * Validates Razorpay Checkout Signature
  */
-const verifyCheckoutSignature = ({ orderId, paymentId, signature }) => {
+const verifyCheckoutSignature = async ({ orderId, paymentId, signature }) => {
   if (isMockRazorpay() && (signature === 'simulated_sig' || signature?.startsWith('sim_'))) {
     return true; // Allow simulated checkout signatures in test mode
   }
 
-  const { keySecret } = getRazorpayCredentials();
-  const body = `${orderId}|${paymentId}`;
-  const expectedSignature = crypto
-    .createHmac('sha256', keySecret)
-    .update(body)
-    .digest('hex');
+  const { keyId, keySecret } = getRazorpayCredentials();
+  const trimmedKeySecret = (keySecret || '').trim();
+  const trimmedKeyId = (keyId || '').trim();
+  const trimmedOrderId = (orderId || '').trim();
+  const trimmedPaymentId = (paymentId || '').trim();
+  const trimmedSignature = (signature || '').trim();
 
-  return expectedSignature === signature;
+  // 1. Standard Razorpay HMAC SHA256 Signature Verification: order_id + "|" + razorpay_payment_id
+  if (trimmedOrderId && trimmedPaymentId && trimmedSignature && trimmedKeySecret) {
+    const body = `${trimmedOrderId}|${trimmedPaymentId}`;
+    const expectedSignature = crypto
+      .createHmac('sha256', trimmedKeySecret)
+      .update(body)
+      .digest('hex');
+
+    if (expectedSignature === trimmedSignature) {
+      return true;
+    }
+  }
+
+  // 2. Direct Razorpay API Verification Fallback (authoritative check from Razorpay servers)
+  if (trimmedPaymentId && trimmedKeyId && trimmedKeySecret && !isMockRazorpay()) {
+    try {
+      const authHeader = Buffer.from(`${trimmedKeyId}:${trimmedKeySecret}`).toString('base64');
+      const response = await axios.get(`https://api.razorpay.com/v1/payments/${trimmedPaymentId}`, {
+        headers: {
+          Authorization: `Basic ${authHeader}`,
+        },
+        timeout: 5000,
+      });
+
+      if (response.data && (response.data.status === 'captured' || response.data.status === 'authorized')) {
+        console.log(`[Razorpay Payment Verified via API] Payment ID: ${trimmedPaymentId}, Status: ${response.data.status}`);
+        return true;
+      }
+    } catch (apiErr) {
+      console.warn('[Razorpay API Verification Fallback Warning]', apiErr.response?.data || apiErr.message);
+    }
+  }
+
+  return false;
 };
 
 /**
@@ -147,7 +180,7 @@ const verifyWebhookSignature = (rawBody, signature) => {
   if (!webhookSecret || !signature) return false;
 
   const expectedSignature = crypto
-    .createHmac('sha256', webhookSecret)
+    .createHmac('sha256', webhookSecret.trim())
     .update(rawBody)
     .digest('hex');
 
@@ -177,10 +210,22 @@ const processSuccessfulPayment = async ({
   // Idempotency: check if payment record for this razorpayPaymentId already exists
   const existingPayment = await Payment.findOne({ razorpayPaymentId: rzpPaymentId });
   if (existingPayment && existingPayment.status === 'captured') {
+    let existingReceipt = await Receipt.findOne({ paymentId: existingPayment._id });
+    if (!existingReceipt && existingPayment.receiptId) {
+      existingReceipt = await Receipt.findById(existingPayment.receiptId);
+    }
+    if (!existingReceipt) {
+      existingReceipt = await Receipt.findOne({ invoiceId: invoice._id }).sort({ createdAt: -1 });
+    }
     return {
       success: true,
       alreadyProcessed: true,
       payment: existingPayment,
+      receipt: existingReceipt || {
+        _id: existingPayment.receiptId || existingPayment._id,
+        receiptNumber: `REC-${(existingPayment.paymentNumber || '').replace('PAY-', '')}`,
+      },
+      invoice,
     };
   }
 

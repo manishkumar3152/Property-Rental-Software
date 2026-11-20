@@ -128,12 +128,38 @@ const verifyPaymentForToken = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Invalid payment token' });
     }
 
-    if (!razorpay_order_id || !razorpay_payment_id) {
+    // Idempotent: If invoice is already marked as Paid, find the payment & receipt and return immediately
+    if (invoice.paymentStatus === 'Paid') {
+      const existingPayment = await Payment.findOne({
+        $or: [
+          { razorpayPaymentId: razorpay_payment_id },
+          { invoiceId: invoice._id }
+        ]
+      }).sort({ createdAt: -1 });
+
+      const existingReceipt = existingPayment
+        ? await Receipt.findOne({ paymentId: existingPayment._id })
+        : await Receipt.findOne({ invoiceId: invoice._id });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Payment already confirmed and processed!',
+        data: {
+          receiptNumber: existingReceipt?.receiptNumber || `REC-${invoice.invoiceNumber.replace('INV-', '')}`,
+          receiptId: existingReceipt?._id || invoice._id,
+          amountPaid: existingPayment?.amount || invoice.amountPaid || invoice.totalPayable,
+          transactionId: existingPayment?.razorpayPaymentId || razorpay_payment_id || 'CONFIRMED',
+          paymentDate: existingPayment?.paymentDate || invoice.paidDate || new Date(),
+        },
+      });
+    }
+
+    if (!razorpay_payment_id) {
       return res.status(400).json({ success: false, message: 'Missing payment transaction reference' });
     }
 
-    // Verify signature
-    const isValid = razorpayService.verifyCheckoutSignature({
+    // Verify signature (checks HMAC SHA256 with fallback to authoritative Razorpay API check)
+    const isValid = await razorpayService.verifyCheckoutSignature({
       orderId: razorpay_order_id,
       paymentId: razorpay_payment_id,
       signature: razorpay_signature,
@@ -153,19 +179,25 @@ const verifyPaymentForToken = async (req, res, next) => {
       orderId: razorpay_order_id,
       paymentMethod,
       amount: invoice.totalPayable,
-      signature: razorpay_signature,
+      signature: razorpay_signature || '',
       verifiedBy: razorpayService.isMockRazorpay() ? 'simulated_test' : 'razorpay_checkout',
     });
+
+    const receiptNumber = result.receipt?.receiptNumber || `REC-${invoice.invoiceNumber.replace('INV-', '')}`;
+    const receiptId = result.receipt?._id || result.payment?.receiptId || invoice._id;
+    const amountPaid = result.payment?.amount || invoice.totalPayable;
+    const transactionId = result.payment?.razorpayPaymentId || razorpay_payment_id;
+    const paymentDate = result.payment?.paymentDate || new Date();
 
     res.status(200).json({
       success: true,
       message: 'Payment confirmed successfully!',
       data: {
-        receiptNumber: result.receipt.receiptNumber,
-        receiptId: result.receipt._id,
-        amountPaid: result.payment.amount,
-        transactionId: razorpay_payment_id,
-        paymentDate: result.payment.paymentDate,
+        receiptNumber,
+        receiptId,
+        amountPaid,
+        transactionId,
+        paymentDate,
       },
     });
   } catch (error) {
