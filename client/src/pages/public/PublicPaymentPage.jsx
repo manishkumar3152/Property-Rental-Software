@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   Lock,
   ArrowRight,
+  ArrowLeft,
   Receipt,
   User,
   Clock,
@@ -18,7 +19,7 @@ import { publicApi, receiptApi } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { formatINR, formatDate, formatMonth } from '../../utils/formatters';
 
-const PublicPaymentPage = ({ token: propToken, onBackToLogin }) => {
+const PublicPaymentPage = ({ token: propToken, onBackToLogin, onBackToTenantPortal }) => {
   // If token is in URL path: e.g. /pay/:token
   const token = propToken || window.location.pathname.split('/pay/')[1] || '';
   const { success: toastSuccess, error: toastError } = useToast();
@@ -31,6 +32,26 @@ const PublicPaymentPage = ({ token: propToken, onBackToLogin }) => {
   // Simulated Checkout Modal for Sandbox/Test mode
   const [isTestCheckoutModalOpen, setIsTestCheckoutModalOpen] = useState(false);
   const [testMethod, setTestMethod] = useState('upi');
+
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      window.history.back();
+    } else if (onBackToTenantPortal) {
+      onBackToTenantPortal();
+    } else if (onBackToLogin) {
+      onBackToLogin();
+    } else {
+      window.location.href = '/login';
+    }
+  };
+
+  const handleGoToLogin = () => {
+    if (onBackToLogin) {
+      onBackToLogin();
+    } else {
+      window.location.href = '/login';
+    }
+  };
 
   const fetchInvoice = async () => {
     setLoading(true);
@@ -192,6 +213,28 @@ const PublicPaymentPage = ({ token: propToken, onBackToLogin }) => {
   return (
     <div className="min-h-screen bg-slate-50/80 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-xl mx-auto space-y-5">
+        {/* Navigation Bar with Back Button */}
+        <div className="flex items-center justify-between pb-1">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 rounded-lg border border-slate-200 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+            title="Go back"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 text-slate-600" />
+            <span>Back</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleGoToLogin}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-sky-700 bg-white hover:bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 shadow-2xs transition-colors cursor-pointer"
+          >
+            <span>Portal Login</span>
+            <ExternalLink className="w-3 h-3 text-slate-400" />
+          </button>
+        </div>
+
         {/* Brand Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -372,17 +415,17 @@ const PublicPaymentPage = ({ token: propToken, onBackToLogin }) => {
           </div>
         </div>
 
-        {/* Footer / Back */}
-        {onBackToLogin && (
-          <div className="text-center">
-            <button
-              onClick={onBackToLogin}
-              className="text-xs text-slate-500 hover:text-slate-800 underline font-medium"
-            >
-              Management Portal Login
-            </button>
-          </div>
-        )}
+        {/* Footer / Back to Management Portal Login */}
+        <div className="text-center pt-2">
+          <button
+            type="button"
+            onClick={handleGoToLogin}
+            className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-sky-700 underline font-medium transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Management Portal Login</span>
+          </button>
+        </div>
       </div>
 
       {/* Test / Sandbox Checkout Modal */}

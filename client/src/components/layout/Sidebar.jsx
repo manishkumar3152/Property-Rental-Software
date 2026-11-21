@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useRouter } from '../../context/RouterContext';
 import { NAV_ITEMS } from '../../constants/navigation';
 
 const iconMap = {
@@ -38,12 +39,19 @@ const iconMap = {
 
 const Sidebar = ({ activeTab, onSelectTab, isMobileOpen, setIsMobileOpen }) => {
   const { user, role, logout } = useAuth();
+  const { route, navigate } = useRouter();
 
   const allowedNavItems = NAV_ITEMS.filter((item) => item.roles.includes(role));
 
-  const handleNavClick = (id) => {
-    onSelectTab(id);
+  const handleNavClick = (item) => {
+    if (onSelectTab) onSelectTab(item.id);
+    navigate(item.path || `/${item.id}`);
     if (setIsMobileOpen) setIsMobileOpen(false);
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
   };
 
   return (
@@ -86,8 +94,8 @@ const Sidebar = ({ activeTab, onSelectTab, isMobileOpen, setIsMobileOpen }) => {
         {/* Quick Action Button */}
         <div className="p-3">
           <button
-            onClick={() => handleNavClick('rent')}
-            className="w-full flex items-center justify-center space-x-2 px-3.5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-medium text-xs shadow-xs transition-all duration-150"
+            onClick={() => handleNavClick({ id: 'rent', path: '/rent' })}
+            className="w-full flex items-center justify-center space-x-2 px-3.5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-medium text-xs shadow-xs transition-all duration-150 cursor-pointer"
           >
             <Receipt className="w-4 h-4" />
             <span>Generate Invoices</span>
@@ -101,12 +109,16 @@ const Sidebar = ({ activeTab, onSelectTab, isMobileOpen, setIsMobileOpen }) => {
           </div>
           {allowedNavItems.map((item) => {
             const Icon = iconMap[item.icon] || LayoutDashboard;
-            const isActive = activeTab === item.id;
+            const isActive =
+              (activeTab && activeTab === item.id) ||
+              route.section === item.id ||
+              route.rawSection === item.id ||
+              (item.id === 'tenants' && (route.section === 'tenants' || route.rawSection === 'tenant'));
 
             return (
               <button
                 key={item.id}
-                onClick={() => handleNavClick(item.id)}
+                onClick={() => handleNavClick(item)}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-[13.5px] transition-all cursor-pointer ${
                   isActive
                     ? 'bg-sky-50 text-sky-700 font-semibold border-l-4 border-sky-600 shadow-2xs'
@@ -135,9 +147,9 @@ const Sidebar = ({ activeTab, onSelectTab, isMobileOpen, setIsMobileOpen }) => {
               <p className="text-[11px] text-slate-500 truncate">{user?.email}</p>
             </div>
             <button
-              onClick={logout}
+              onClick={handleLogout}
               title="Sign out"
-              className="p-1.5 rounded-md hover:bg-slate-200 text-slate-500 hover:text-rose-600 transition-colors"
+              className="p-1.5 rounded-md hover:bg-slate-200 text-slate-500 hover:text-rose-600 transition-colors cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
             </button>

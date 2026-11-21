@@ -22,6 +22,7 @@ import Breadcrumb from '../../components/common/Breadcrumb';
 import { propertyApi, ownerApi } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useRouter } from '../../context/RouterContext';
 import { formatINR, formatDate } from '../../utils/formatters';
 
 const PROPERTY_TYPES = ['Shop', 'House', 'Flat', 'Office', 'Warehouse', 'Plot', 'Other'];
@@ -30,6 +31,7 @@ const AVAILABILITY_STATUSES = ['Available', 'Occupied', 'Maintenance', 'Inactive
 const PropertyList = () => {
   const { isSuperAdmin, isOwner, role } = useAuth();
   const { success: toastSuccess, error: toastError } = useToast();
+  const { route, navigate } = useRouter();
 
   const [properties, setProperties] = useState([]);
   const [owners, setOwners] = useState([]);
@@ -115,6 +117,36 @@ const PropertyList = () => {
     fetchProperties();
   }, [filterType, filterStatus, filterOwner]);
 
+  // Synchronize route action with view states
+  useEffect(() => {
+    if (route.section === 'properties') {
+      if (route.action === 'add') {
+        setSelectedProperty(null);
+        setFormData({
+          propertyName: '',
+          propertyNumber: '',
+          propertyType: 'Flat',
+          ownerId: owners[0]?._id || '',
+          address: {
+            fullAddress: '',
+            city: 'Bengaluru',
+            state: 'Karnataka',
+            pinCode: '560001',
+          },
+          monthlyBaseRent: '',
+          securityDeposit: '',
+          description: '',
+          allowMultiTenancy: false,
+        });
+        setViewMode('form');
+      } else if (route.action === 'edit') {
+        setViewMode('form');
+      } else {
+        setViewMode('list');
+      }
+    }
+  }, [route.action, route.section, owners.length]);
+
   const handleOpenAdd = (prop = null) => {
     if (prop) {
       setSelectedProperty(prop);
@@ -134,6 +166,7 @@ const PropertyList = () => {
         description: prop.description || '',
         allowMultiTenancy: prop.allowMultiTenancy || false,
       });
+      navigate('/properties/edit');
     } else {
       setSelectedProperty(null);
       setFormData({
@@ -152,8 +185,8 @@ const PropertyList = () => {
         description: '',
         allowMultiTenancy: false,
       });
+      navigate('/properties/add');
     }
-    setViewMode('form');
   };
 
   const handleSaveProperty = async (e) => {
@@ -167,7 +200,7 @@ const PropertyList = () => {
         await propertyApi.create(formData);
         toastSuccess('Property created successfully');
       }
-      setViewMode('list');
+      navigate('/properties');
       fetchProperties();
     } catch (err) {
       toastError(err.response?.data?.message || 'Failed to save property');
@@ -421,9 +454,9 @@ const PropertyList = () => {
     return (
       <div className="space-y-6">
         <Breadcrumb
-          onBack={() => setViewMode('list')}
+          onBack={() => navigate('/properties')}
           items={[
-            { label: 'Properties', onClick: () => setViewMode('list') },
+            { label: 'Properties', onClick: () => navigate('/properties') },
             { label: selectedProperty ? `Edit Property: ${selectedProperty.propertyName}` : 'Register New Property' },
           ]}
         />
@@ -435,7 +468,7 @@ const PropertyList = () => {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setViewMode('list')}
+                onClick={() => navigate('/properties')}
                 className="px-3.5 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors shadow-2xs cursor-pointer"
               >
                 Cancel
@@ -656,7 +689,7 @@ const PropertyList = () => {
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
             <button
               type="button"
-              onClick={() => setViewMode('list')}
+              onClick={() => navigate('/properties')}
               className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors shadow-2xs cursor-pointer"
             >
               Cancel & Return to Inventory

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { RouterProvider, useRouter } from './context/RouterContext';
 import Sidebar from './components/layout/Sidebar';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
@@ -27,54 +28,49 @@ import PublicPaymentPage from './pages/public/PublicPaymentPage';
 import PublicTenantPortal from './pages/public/PublicTenantPortal';
 
 const AppContent = () => {
-  const { isAuthenticated, loading, role, isOwner } = useAuth();
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const { isAuthenticated, loading, isOwner } = useAuth();
+  const { currentPath, route, navigate } = useRouter();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  // URL Path router
-  const [currentPath, setCurrentPath] = useState(window.location.pathname);
-  const [publicPaymentToken, setPublicPaymentToken] = useState('');
-
+  // Sync / Guard URLs:
   useEffect(() => {
-    const handleLocationChange = () => {
-      const path = window.location.pathname;
-      setCurrentPath(path);
-      if (path.startsWith('/pay/')) {
-        const token = path.replace('/pay/', '');
-        setPublicPaymentToken(token);
+    if (!loading) {
+      if (isAuthenticated) {
+        // If logged in and on /login or root /, immediately push /dashboard so URL is never stuck at /login
+        if (currentPath === '/login' || currentPath === '/' || currentPath === '') {
+          navigate('/dashboard', { replace: true });
+        }
+      } else {
+        // If not authenticated and trying to access an internal route
+        if (
+          !currentPath.startsWith('/pay/') &&
+          currentPath !== '/tenant-portal' &&
+          currentPath !== '/login'
+        ) {
+          navigate('/login', { replace: true });
+        }
       }
-    };
-
-    window.addEventListener('popstate', handleLocationChange);
-    handleLocationChange();
-    return () => window.removeEventListener('popstate', handleLocationChange);
-  }, []);
-
-  const navigateTo = (path) => {
-    window.history.pushState({}, '', path);
-    setCurrentPath(path);
-    if (path.startsWith('/pay/')) {
-      const token = path.replace('/pay/', '');
-      setPublicPaymentToken(token);
     }
-  };
+  }, [isAuthenticated, loading, currentPath, navigate]);
 
   // 1. Public Payment Link Route: /pay/:token
-  if (currentPath.startsWith('/pay/') || publicPaymentToken) {
+  if (currentPath.startsWith('/pay/') || route.section === 'pay') {
+    const token = route.action || currentPath.replace('/pay/', '');
     return (
       <PublicPaymentPage
-        token={publicPaymentToken || currentPath.replace('/pay/', '')}
-        onBackToLogin={() => navigateTo('/login')}
+        token={token}
+        onBackToLogin={() => navigate('/login')}
+        onBackToTenantPortal={() => navigate('/tenant-portal')}
       />
     );
   }
 
   // 2. Public Tenant Portal Route: /tenant-portal
-  if (currentPath === '/tenant-portal') {
+  if (route.section === 'tenant-portal' || currentPath === '/tenant-portal') {
     return (
       <PublicTenantPortal
-        onBackToLogin={() => navigateTo('/login')}
-        onOpenPaymentLink={(token) => navigateTo(`/pay/${token}`)}
+        onBackToLogin={() => navigate('/login')}
+        onOpenPaymentLink={(token) => navigate(`/pay/${token}`)}
       />
     );
   }
@@ -93,12 +89,12 @@ const AppContent = () => {
 
   // 4. Unauthenticated state -> Login
   if (!isAuthenticated) {
-    return <Login onOpenTenantPortal={() => navigateTo('/tenant-portal')} />;
+    return <Login onOpenTenantPortal={() => navigate('/tenant-portal')} />;
   }
 
   // 5. Authenticated ERP Dashboard & Portal
   const renderContent = () => {
-    switch (activeTab) {
+    switch (route.section) {
       case 'dashboard':
         return isOwner ? <OwnerDashboard /> : <AdminDashboard />;
       case 'properties':
@@ -112,7 +108,7 @@ const AppContent = () => {
       case 'rent':
         return (
           <RentInvoiceList
-            onOpenPublicPayment={(token) => navigateTo(`/pay/${token}`)}
+            onOpenPublicPayment={(token) => navigate(`/pay/${token}`)}
           />
         );
       case 'payments':
@@ -137,17 +133,15 @@ const AppContent = () => {
   return (
     <div className="h-screen flex bg-slate-50 text-slate-800 overflow-hidden">
       <Sidebar
-        activeTab={activeTab}
-        onSelectTab={setActiveTab}
         isMobileOpen={isMobileOpen}
         setIsMobileOpen={setIsMobileOpen}
       />
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         {/* Fixed Header / Navbar */}
         <Navbar
-          activeTab={activeTab}
+          activeTab={route.section}
           onOpenMobileSidebar={() => setIsMobileOpen(true)}
-          onOpenTenantPortal={() => navigateTo('/tenant-portal')}
+          onOpenTenantPortal={() => navigate('/tenant-portal')}
         />
 
         {/* Scrollable Main Viewport */}
@@ -166,7 +160,9 @@ function App() {
   return (
     <AuthProvider>
       <ToastProvider>
-        <AppContent />
+        <RouterProvider>
+          <AppContent />
+        </RouterProvider>
       </ToastProvider>
     </AuthProvider>
   );

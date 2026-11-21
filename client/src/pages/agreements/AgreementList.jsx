@@ -22,6 +22,7 @@ import Breadcrumb from '../../components/common/Breadcrumb';
 import { agreementApi, propertyApi, tenantApi, ownerApi } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useRouter } from '../../context/RouterContext';
 import { formatINR, formatDate } from '../../utils/formatters';
 
 const AGREEMENT_STATUSES = ['Active', 'Expiring', 'Expired', 'Draft', 'Terminated'];
@@ -29,6 +30,7 @@ const AGREEMENT_STATUSES = ['Active', 'Expiring', 'Expired', 'Draft', 'Terminate
 const AgreementList = () => {
   const { isSuperAdmin, isOwner } = useAuth();
   const { success: toastSuccess, error: toastError } = useToast();
+  const { route, navigate } = useRouter();
 
   const [agreements, setAgreements] = useState([]);
   const [properties, setProperties] = useState([]);
@@ -114,6 +116,33 @@ const AgreementList = () => {
     fetchDependencies();
   }, []);
 
+  // Synchronize route action with view states
+  useEffect(() => {
+    if (route.section === 'agreements') {
+      if (route.action === 'add') {
+        setFormData({
+          propertyId: properties[0]?._id || '',
+          tenantId: tenants[0]?._id || '',
+          agreementStartDate: new Date().toISOString().split('T')[0],
+          agreementDuration: 11,
+          monthlyRent: properties[0]?.monthlyBaseRent || 30000,
+          securityDeposit: properties[0]?.securityDeposit || 100000,
+          rentGenerationDay: 1,
+          monthlyDueDate: 10,
+          gracePeriod: 3,
+          fineType: 'per_day',
+          fineValue: 100,
+          maxFineLimit: 2000,
+          rentIncrementPercentage: 10,
+          renewalConditions: 'Standard 11-month lease renewal with 10% rent escalation subject to mutual agreement.',
+        });
+        setViewMode('form');
+      } else {
+        setViewMode('list');
+      }
+    }
+  }, [route.action, route.section, properties.length, tenants.length]);
+
   const handleOpenAdd = () => {
     setFormData({
       propertyId: properties[0]?._id || '',
@@ -131,7 +160,7 @@ const AgreementList = () => {
       rentIncrementPercentage: 10,
       renewalConditions: 'Standard 11-month lease renewal with 10% rent escalation subject to mutual agreement.',
     });
-    setViewMode('form');
+    navigate('/agreements/add');
   };
 
   const handleCreateAgreement = async (e) => {
@@ -145,7 +174,7 @@ const AgreementList = () => {
       };
       await agreementApi.create(payload);
       toastSuccess('Rental agreement created and activated');
-      setViewMode('list');
+      navigate('/agreements');
       fetchAgreements();
     } catch (err) {
       toastError(err.response?.data?.message || 'Failed to create agreement');
@@ -392,9 +421,9 @@ const AgreementList = () => {
     return (
       <div className="space-y-6">
         <Breadcrumb
-          onBack={() => setViewMode('list')}
+          onBack={() => navigate('/agreements')}
           items={[
-            { label: 'Rental Agreements', onClick: () => setViewMode('list') },
+            { label: 'Rental Agreements', onClick: () => navigate('/agreements') },
             { label: 'Create Rental Lease Agreement' },
           ]}
         />
@@ -406,7 +435,7 @@ const AgreementList = () => {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setViewMode('list')}
+                onClick={() => navigate('/agreements')}
                 className="px-3.5 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors shadow-2xs cursor-pointer"
               >
                 Cancel
@@ -655,7 +684,7 @@ const AgreementList = () => {
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
             <button
               type="button"
-              onClick={() => setViewMode('list')}
+              onClick={() => navigate('/agreements')}
               className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors shadow-2xs cursor-pointer"
             >
               Cancel & Return to List

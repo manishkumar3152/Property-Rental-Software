@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Building, Lock, Mail, ArrowRight, ShieldCheck, UserCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useRouter } from '../../context/RouterContext';
 
 const DEMO_ACCOUNTS = [
   { role: 'Super Admin', email: 'admin@propertyerp.com', pass: 'Admin@12345', badge: 'Full Access' },
@@ -14,6 +15,7 @@ const DEMO_ACCOUNTS = [
 const Login = ({ onOpenTenantPortal }) => {
   const { login } = useAuth();
   const { error: toastError, success: toastSuccess } = useToast();
+  const { navigate } = useRouter();
 
   const [email, setEmail] = useState('admin@propertyerp.com');
   const [password, setPassword] = useState('Admin@12345');
@@ -30,6 +32,7 @@ const Login = ({ onOpenTenantPortal }) => {
     try {
       await login(email, password);
       toastSuccess('Signed in successfully');
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       toastError(err.response?.data?.message || 'Login failed. Please verify credentials.');
     } finally {
